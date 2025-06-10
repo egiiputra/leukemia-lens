@@ -10,27 +10,101 @@ function App() {
 
   const [results, setResults] = useState([])
 
-  useEffect(() => {
+  const filesInputRef = useRef(null)
 
+  function displayBatchPreviews(imgs) {
+    console.log(imgs)
+    const previewData = imgs.map(file => {
+      return {
+        url: URL.createObjectURL(file),
+        filename: file.name
+      }
+    });
+    setFiles([...files, ...previewData])
+  }
+
+  function handleBatchFiles(event) {
+    const batchFiles = Array.from(event.target.files);
+    if (batchFiles.length > 0) {
+        displayBatchPreviews(batchFiles);
+        // document.getElementById('batch-analyze').disabled = false;
+    }
+  }
+  function displayBatchResults(results) {
+    const resultsContainer = document.getElementById('batch-results');
+    
+    let tableHTML = `
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Filename</th>
+                    <th>Classification</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    results.forEach(result => {
+      tableHTML += `
+        <tr>
+          <td><img src="${result.image}" alt="Cell" class="table-image"></td>
+          <td>${result.filename}</td>
+          <td>${result.fullName}</td>
+          <td>${result.confidence}%</td>
+          <td><span class="status-badge status-${result.status.toLowerCase()}">${result.status}</span></td>
+        </tr>
+      `;
+    });
+
+    tableHTML += `
+        </tbody>
+    </table>
+    `;
+
+    resultsContainer.innerHTML = tableHTML;
+  }
+  function generateMockBatchResults() {
+    const classifications = ['ALL', 'AML', 'CLL', 'Normal'];
+    const fullNames = {
+        'ALL': 'Acute Lymphoblastic Leukemia',
+        'AML': 'Acute Myeloid Leukemia', 
+        'CLL': 'Chronic Lymphocytic Leukemia',
+        'Normal': 'Normal Blood Cells'
+    };
+    
+    return files.map((file, index) => {
+        const classification = classifications[Math.floor(Math.random() * classifications.length)];
+        const confidence = (Math.random() * 0.3 + 0.7) * 100;
+        
+        return {
+            filename: file.filename,
+            classification,
+            fullName: fullNames[classification],
+            confidence: confidence.toFixed(1),
+            status: classification === 'Normal' ? 'Negative' : 'Positive',
+            image: file.url
+        };
+    });
+}
+
+  function analyzeBatch() {
+    console.log('ok')
+    const resultsContainer = document.getElementById('batch-results');
+    resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Processing batch analysis...</div>';
+    
+    // Simulate AI processing
+    setTimeout(() => {
+        const mockResults = generateMockBatchResults();
+        displayBatchResults(mockResults);
+    }, 4000);
+  }
+
+  useEffect(() => {
     console.log('loading', isLoading)
   }, [isLoading])
-
-  useEffect(() => {
-    console.log(files)
-    if (files.length > 0) {
-      const reader = new FileReader()
-      reader.onload = function (e) {
-        setSinglePreview(
-          <div>
-            <img src={e.target.result} alt="Preview" className="preview-image"/>
-            <div className="preview-name">{files[0].name}</div>
-          </div>
-        )
-        console.log(e.target.result)
-      }
-      reader.readAsDataURL(files[0])
-    }
-  }, [files])
 
   return (
     <div className="container">
@@ -42,20 +116,45 @@ function App() {
       <div className="main-content">
         <div 
           id="batch-section"
-          className={`inference-section ${(mode=='batch') && 'active'}`}
+          className='inference-section active'
         >
           <div
             className="upload-area"
-            onClick="document.getElementById('batch-files').click()"
+            onClick={() => filesInputRef.current.click()}
           >
             <span className="upload-icon">📊</span>
-            <div className="upload-text">Upload Blood Cell Images</div>
-            <div className="upload-subtext">Select microscopy images for batch analysis</div>
+            <div 
+              className="upload-text"
+            >
+              Upload Blood Cell Images
+            </div>
+            <div className="upload-subtext">
+              Select microscopy images for batch analysis
+            </div>
           </div>
-          <input type="file" id="batch-files" className="file-input" accept="image/*" multiple onChange="handleBatchFiles(event)"/>
+          <input
+            ref={filesInputRef}
+            type="file"
+            id="batch-files"
+            className="file-input"
+            accept="image/*"
+            onChange={handleBatchFiles}
+            multiple/>
 
-          <div id="batch-preview" className="preview-container"></div>
-          <button id="batch-analyze" className="analyze-btn" onClick="analyzeBatch()" disabled>Analyze Batch</button>
+          <div id="batch-preview" className="preview-container">
+            {files.map((file, i) =>
+              <div key={i} className='preview-item'>
+                <img 
+                src={file.url}
+                alt="Preview"
+                className="preview-image"/>
+                <div className="preview-name">
+                  {file.filename}
+                </div>
+              </div>
+            )}
+          </div>
+          <button id="batch-analyze" className="analyze-btn" onClick={analyzeBatch}>Analyze Batch</button>
           <div id="batch-results" className="results-container"></div>
         </div>
 
