@@ -12,23 +12,9 @@ function App() {
 
   const filesInputRef = useRef(null)
 
-  function displayBatchPreviews(imgs) {
-    console.log(imgs)
-    const previewData = imgs.map(file => {
-      return {
-        url: URL.createObjectURL(file),
-        filename: file.name
-      }
-    });
-    setFiles([...files, ...previewData])
-  }
-
   function handleBatchFiles(event) {
-    const batchFiles = Array.from(event.target.files);
-    if (batchFiles.length > 0) {
-        displayBatchPreviews(batchFiles);
-        // document.getElementById('batch-analyze').disabled = false;
-    }
+    setFiles(Array.from(event.target.files))
+    document.getElementById('batch-analyze').disabled = false;
   }
   function displayBatchResults(results) {
     const resultsContainer = document.getElementById('batch-results');
@@ -80,12 +66,12 @@ function App() {
         const confidence = (Math.random() * 0.3 + 0.7) * 100;
         
         return {
-            filename: file.filename,
+            filename: file.name,
             classification,
             fullName: fullNames[classification],
             confidence: confidence.toFixed(1),
             status: classification === 'Normal' ? 'Negative' : 'Positive',
-            image: file.url
+            image: URL.createObjectURL(file)
         };
     });
 }
@@ -97,7 +83,7 @@ function App() {
     
     // Simulate AI processing
     setTimeout(() => {
-        const mockResults = generateMockBatchResults();
+        setResults(generateMockBatchResults())
         displayBatchResults(mockResults);
     }, 4000);
   }
@@ -145,17 +131,42 @@ function App() {
             {files.map((file, i) =>
               <div key={i} className='preview-item'>
                 <img 
-                src={file.url}
+                src={URL.createObjectURL(file)}
                 alt="Preview"
                 className="preview-image"/>
                 <div className="preview-name">
-                  {file.filename}
+                  {file.name}
                 </div>
               </div>
             )}
           </div>
           <button id="batch-analyze" className="analyze-btn" onClick={analyzeBatch}>Analyze Batch</button>
-          <div id="batch-results" className="results-container"></div>
+          <div id="batch-results" className="results-container">
+            {(results.length > 0) &&
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>Image</th>
+                    <th>Filename</th>
+                    <th>Classification</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map(result => 
+                      <tr>
+                        <td><img src={result.image} alt="Cell" class="table-image"/></td>
+                        <td>{result.filename}</td>
+                        <td>{result.fullName}</td>
+                        <td>{result.confidence}%</td>
+                        <td><span class="status-badge status-${result.status.toLowerCase()}">${result.status}</span></td>
+                      </tr>
+                  )}
+                </tbody>
+              </table>
+            }
+          </div>
         </div>
 
         <div className="medical-info">
