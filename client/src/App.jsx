@@ -1,6 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
-// import reactLogo from './assets/react.svg'
-// import viteLogo from '/vite.svg'
+import { useState, useRef } from 'react'
 import './App.css'
 
 function App() {
@@ -16,81 +14,55 @@ function App() {
     setFiles(Array.from(event.target.files))
     document.getElementById('batch-analyze').disabled = false;
   }
-  function displayBatchResults(results) {
-    const resultsContainer = document.getElementById('batch-results');
-    
-    let tableHTML = `
-        <table class="results-table">
-            <thead>
-                <tr>
-                    <th>Image</th>
-                    <th>Filename</th>
-                    <th>Classification</th>
-                    <th>Confidence</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    results.forEach(result => {
-      tableHTML += `
-        <tr>
-          <td><img src="${result.image}" alt="Cell" class="table-image"></td>
-          <td>${result.filename}</td>
-          <td>${result.fullName}</td>
-          <td>${result.confidence}%</td>
-          <td><span class="status-badge status-${result.status.toLowerCase()}">${result.status}</span></td>
-        </tr>
-      `;
-    });
 
-    tableHTML += `
-        </tbody>
-    </table>
-    `;
-
-    resultsContainer.innerHTML = tableHTML;
-  }
-  function generateMockBatchResults() {
-    const classifications = ['ALL', 'AML', 'CLL', 'Normal'];
-    const fullNames = {
-        'ALL': 'Acute Lymphoblastic Leukemia',
-        'AML': 'Acute Myeloid Leukemia', 
-        'CLL': 'Chronic Lymphocytic Leukemia',
-        'Normal': 'Normal Blood Cells'
-    };
-    
-    return files.map((file, index) => {
-        const classification = classifications[Math.floor(Math.random() * classifications.length)];
-        const confidence = (Math.random() * 0.3 + 0.7) * 100;
-        
-        return {
-            filename: file.name,
-            classification,
-            fullName: fullNames[classification],
-            confidence: confidence.toFixed(1),
-            status: classification === 'Normal' ? 'Negative' : 'Positive',
-            image: URL.createObjectURL(file)
-        };
-    });
-}
-
-  function analyzeBatch() {
-    console.log('ok')
-    const resultsContainer = document.getElementById('batch-results');
-    resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Processing batch analysis...</div>';
-    
-    // Simulate AI processing
-    setTimeout(() => {
-        setResults(generateMockBatchResults())
-        displayBatchResults(mockResults);
-    }, 4000);
+  function downloadJSONAsCSV() {
+    let csvData = jsonToCsv(results); // Add .items.data
+    // Create a CSV file and allow the user to download it
+    let blob = new Blob([csvData], { type: 'text/csv' });
+    let url = window.URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.csv';
+    document.body.appendChild(a);
+    a.click();
   }
 
-  useEffect(() => {
-    console.log('loading', isLoading)
-  }, [isLoading])
+  function jsonToCsv(jsonData) {
+    let csv = '';
+    let headers = ['filename', 'benign', 'early', 'pre', 'pro', 'class'];
+    csv += headers.join(',') + '\n';
+
+    jsonData.forEach(function (row) {
+      const data = [
+        row.filename,
+        ...['benign', 'early', 'pre', 'pro'].map(cls => row.scores[cls]),
+        row.class
+      ].join(',')
+      csv += data + '\n';
+    });
+    return csv;
+  }
+
+  function analyzeBatch(formData) {
+    setIsLoading(true)
+
+    fetch('/api/predicts', {
+      method: 'POST',
+      body: formData,
+    })
+      .then(response => response.json())
+      .then(body => body['predictions'])
+      .then(predictions => {
+        setResults(predictions.map(pred => {
+          return {
+            ...pred,
+            class: Object.keys(pred.scores).reduce((a, b) => pred.scores[a] > pred.scores[b] ? a : b)
+          }
+        }))
+      })
+      .catch((e) => alert(e))
+      .finally(setIsLoading(false))
+  }
 
   return (
     <div className="container">
@@ -118,50 +90,72 @@ function App() {
               Select microscopy images for batch analysis
             </div>
           </div>
-          <input
-            ref={filesInputRef}
-            type="file"
-            id="batch-files"
-            className="file-input"
-            accept="image/*"
-            onChange={handleBatchFiles}
-            multiple/>
+          <form action={analyzeBatch}>
+            <input
+              ref={filesInputRef}
+              type="file"
+              id="batch-files"
+              className="file-input"
+              accept="image/*"
+              onChange={handleBatchFiles}
+              name="images"
+              multiple/>
 
-          <div id="batch-preview" className="preview-container">
-            {files.map((file, i) =>
-              <div key={i} className='preview-item'>
-                <img 
-                src={URL.createObjectURL(file)}
-                alt="Preview"
-                className="preview-image"/>
-                <div className="preview-name">
-                  {file.name}
+            <div id="batch-preview" className="preview-container">
+              {files.map((file, i) =>
+                <div key={i} className='preview-item'>
+                  <img 
+                  src={URL.createObjectURL(file)}
+                  alt="Preview"
+                  className="preview-image"/>
+                  <div className="preview-name">
+                    {file.name}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <button id="batch-analyze" className="analyze-btn" onClick={analyzeBatch}>Analyze Batch</button>
+              )}
+            </div>
+            <button id="batch-analyze" className="analyze-btn" type='submit'>Analyze Batch</button>
+          </form>
+          <button className="analyze-btn" onClick={downloadJSONAsCSV} disabled={results.length == 0}>Download CSV</button>
           <div id="batch-results" className="results-container">
+            {(isLoading) && (
+              <div className="loading"><div className="spinner"></div>Processing batch analysis...</div>
+            )}
             {(results.length > 0) &&
               <table class="results-table">
                 <thead>
                   <tr>
-                    <th>Image</th>
-                    <th>Filename</th>
-                    <th>Classification</th>
-                    <th>Confidence</th>
-                    <th>Status</th>
+                    <th rowSpan={2}>Image</th>
+                    <th rowSpan={2}>Filename</th>
+                    <th colSpan={4}>Score</th>
+                    <th rowSpan={2}>Class</th>
+                  </tr>
+                  <tr>
+                    <th>benign</th>
+                    <th>early</th>
+                    <th>pre</th>
+                    <th>pro</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map(result => 
-                      <tr>
-                        <td><img src={result.image} alt="Cell" class="table-image"/></td>
-                        <td>{result.filename}</td>
-                        <td>{result.fullName}</td>
-                        <td>{result.confidence}%</td>
-                        <td><span class="status-badge status-${result.status.toLowerCase()}">${result.status}</span></td>
-                      </tr>
+                  {results.map((result, i) => 
+                    <tr>
+                      <td><img src={URL.createObjectURL(files[i])} alt="Cell" className="table-image"/></td>
+                      <td>{result.filename}</td>
+                      <td>{result.scores.benign}</td>
+                      <td>{result.scores.early}</td>
+                      <td>{result.scores.pre}</td>
+                      <td>{result.scores.pro}</td>
+                      <td>
+                        <span
+                          className={
+                            `status-badge status-${result.class =='benign' ? 'negative':(result.class == 'pro' ? 'positive':'warning')}`
+                          }
+                        >
+                          {result.class}
+                        </span>
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

@@ -279,6 +279,7 @@ body {
 .results-table td {
   padding: 15px 20px;
   border-bottom: 1px solid #f0f0f0;
+  color: black;
 }
 
 .results-table tr:hover {
@@ -303,6 +304,11 @@ body {
 .status-positive {
   background: #ffebee;
   color: #c62828;
+}
+
+.status-warning {
+  background: #fff5c6;
+  color: #ffbb00;
 }
 
 .status-negative {
