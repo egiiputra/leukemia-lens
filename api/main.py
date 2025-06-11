@@ -1,27 +1,23 @@
-import json
-
+import os
+from dotenv import load_dotenv
 from typing import Union, List
-
 from fastapi import (
     FastAPI,
     UploadFile,
     Response,
     status
 )
-
-# import tensorflow as tf
+from fastapi.middleware.cors import CORSMiddleware
 from tensorflow import (
     convert_to_tensor,
     uint8, 
     float32,
     saved_model
 )
-
 import numpy as np
-
 import cv2
 
-# TODO: add CORS
+load_dotenv() 
 
 CLASS_NAMES = ['benign', 'early', 'pre', 'pro']
 
@@ -31,11 +27,17 @@ model = saved_model.load(f"models/{MODEL_NAME}").signatures['serving_default']
 
 app = FastAPI()
 
-clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        os.environ['ALLOW_ORIGIN']
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 @app.post("/predicts")
 async def predicts(images: List[UploadFile], response: Response):
