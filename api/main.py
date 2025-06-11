@@ -2,13 +2,22 @@ import json
 
 from typing import Union, List
 
-from fastapi import FastAPI
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    Response,
+    status
+)
 
+# import tensorflow as tf
 from tensorflow import (
     convert_to_tensor,
     uint8, 
-    float32
+    float32,
+    saved_model
 )
+
+import numpy as np
 
 import cv2
 
@@ -18,9 +27,11 @@ CLASS_NAMES = ['benign', 'early', 'pre', 'pro']
 
 MODEL_NAME = "clahe-balanced-model"
 
-model = tf.saved_model.load(f"models/{MODEL_NAME}")
+model = saved_model.load(f"models/{MODEL_NAME}").signatures['serving_default']
 
 app = FastAPI()
+
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 @app.get("/")
 async def root():
@@ -40,7 +51,7 @@ async def predicts(images: List[UploadFile], response: Response):
         arr = np.asarray(bytearray(await image.read()), dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-        input_tensor.append(img)
+        input_tensors.append(img)
 
     predictions = []
     for i, input_tensor in enumerate(input_tensors):
@@ -55,15 +66,16 @@ async def predicts(images: List[UploadFile], response: Response):
 
         # resize and normalization (from int to float 0-1)
         img = cv2.resize(img, (224, 224))
-        img = tf.convert_to_tensor([img / 255], dtype=tf.float32)
+        img = convert_to_tensor([img / 255], dtype=float32)
 
         # predict
         pred = model(img)
-
-        output_data = pred.numpy().tolist()['result']
+        print(pred)
+        output_data = np.round(pred['result'].numpy() * 100, 2).tolist()
+        print(output_data)
 
         predictions.append({ 
-            "file_name": images[i].filename,
+            "filename": images[i].filename,
             "scores": {clas:output_data[0][i] for i, clas in enumerate(CLASS_NAMES) }
         })
 
